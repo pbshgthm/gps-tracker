@@ -1,121 +1,4 @@
-#include <Arduino.h>
-#include <Wire.h>
-#include <SD.h>
-#include <SPI.h>
-#include "sensors/EnvironmentalSensor.h"
-#include "sensors/AccelerometerSensor.h"
-#include "sensors/MagnetometerSensor.h"
-#include "sensors/GPSSensor.h"
-#include "display/Display.h"
-
-// Pin Definitions for hardware connections
-const int SDA_PIN = 21;    // I2C data line
-const int SCL_PIN = 22;    // I2C clock line
-const int LED_BUILTIN = 2; // Built-in LED pin for ESP32
-const int BUTTON_PIN = 15; // Button pin for wake-up
-const int SD_CS_PIN = 5;   // Chip Select pin for SD card
-
-// Time definitions for sleep and display behavior
-const uint64_t SLEEP_TIME_US = 10 * 1000000; // Deep sleep duration: 10 seconds (in microseconds)
-const uint64_t DISPLAY_TIME_MS = 5000;       // Display on duration: 5 seconds (in milliseconds)
-
-// Global sensor objects for collecting environmental data
-EnvironmentalSensor envSensor;
-AccelerometerSensor accelSensor;
-MagnetometerSensor magSensor;
-GPSSensor gpsSensor;
-Display display;
-
-// RTC memory variables - these persist across deep sleep cycles
-RTC_DATA_ATTR static uint32_t bootIdentifier = 0;    // Unique identifier for each power-on boot
-RTC_DATA_ATTR static char currentFileName[32] = {0}; // Current log file name storage
-
-time_t now;
-
-/*
- * File Management Functions
- */
-
-String generateLogFileName()
-{
-  // Creates a unique filename by incrementing a counter until an unused name is found
-  int fileCounter = 0;
-  String fileName;
-
-  do
-  {
-    fileName = String("/log_") + String(fileCounter) + String(".csv");
-    fileCounter++;
-  } while (SD.exists(fileName.c_str()));
-
-  // Store the filename in RTC memory for persistence during sleep cycles
-  fileName.toCharArray(currentFileName, sizeof(currentFileName));
-
-  return fileName;
-}
-
-bool initializeSDCard()
-{
-  // Begin SD card communication using the specified chip select pin
-  if (!SD.begin(SD_CS_PIN))
-  {
-    Serial.println("SD Card initialization failed!");
-    return false;
-  }
-
-  Serial.println("SD Card initialization successful.");
-
-  // Generate a new random identifier for fresh boots
-  uint32_t newBootIdentifier = esp_random();
-
-  // Check if this is a new boot by verifying boot identifier and filename
-  bool isNewBoot = (bootIdentifier == 0 || strlen(currentFileName) == 0);
-
-  if (isNewBoot)
-  {
-    // This is a fresh boot - set up new logging session
-    bootIdentifier = newBootIdentifier;
-    String newFileName = generateLogFileName();
-
-    // Create new log file with headers
-    File dataFile = SD.open(currentFileName, FILE_WRITE);
-    if (dataFile)
-    {
-      dataFile.println("Time_ms,Temperature_C,Humidity_Percent,Pressure_hPa");
-      dataFile.close();
-      Serial.println("Created new log file: " + String(currentFileName));
-    }
-    else
-    {
-      Serial.println("Error creating new log file!");
-      return false;
-    }
-  }
-  else
-  {
-    // Continuing existing session after sleep
-    Serial.println("Continuing with existing log file: " + String(currentFileName));
-
-    // Verify the existing file is still accessible
-    if (!SD.exists(currentFileName))
-    {
-      Serial.println("Warning: Existing log file not found! Creating new file.");
-      String newFileName = generateLogFileName();
-      File dataFile = SD.open(currentFileName, FILE_WRITE);
-      if (dataFile)
-      {
-        dataFile.println("Time_ms,Temperature_C,Humidity_Percent,Pressure_hPa");
-        dataFile.close();
-      }
-      else
-      {
-        return false;
-      }
-    }
-  }
-
-  return true;
-}
+#include "main.h"
 
 /*
  * Sensor Management Functions
@@ -136,37 +19,6 @@ void initializeSensors()
   }
 }
 
-void logSensorData(const EnvironmentalSensor::Data &envData)
-{
-  // Verify sensor data validity before logging
-  if (!envData.valid)
-  {
-    Serial.println("Invalid sensor data - skipping logging");
-    return;
-  }
-
-  // Open existing log file in append mode
-  File dataFile = SD.open(currentFileName, FILE_APPEND);
-  if (dataFile)
-  {
-
-    // Create data string with all sensor readings
-    String dataString = String(now) + "," +
-                        String(envData.temperature, 2) + "," +
-                        String(envData.humidity, 1) + "," +
-                        String(envData.pressure, 1);
-
-    // Write to file and close
-    dataFile.println(dataString);
-    dataFile.close();
-    Serial.println("Data logged: " + dataString);
-  }
-  else
-  {
-    Serial.println("Error opening log file for writing!");
-  }
-}
-
 void readAndPrintSensors()
 {
   // Read sensor data
@@ -178,7 +30,7 @@ void readAndPrintSensors()
     envSensor.print();
 
     // Log data to SD card
-    logSensorData(envSensor.getData());
+    storage.logSensorData(envSensor.getData(), now);
   }
 
   Serial.println("\n==============================\n");
@@ -270,7 +122,7 @@ void setup()
   digitalWrite(LED_BUILTIN, HIGH);
 
   // Initialize SD card logging system
-  if (!initializeSDCard())
+  if (!storage.initializeSDCard())
   {
     Serial.println("WARNING: SD card initialization failed - continuing without logging");
   }

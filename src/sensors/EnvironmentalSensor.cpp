@@ -53,6 +53,7 @@ bool EnvironmentalSensor::read()
   data.pressure = bme.readPressure() / 100.0F;
   data.humidity = bme.readHumidity();
   data.altitude = bme.readAltitude(1013.25);
+  data.valid = true;
   lastReadTime = millis();
   return true;
 }
