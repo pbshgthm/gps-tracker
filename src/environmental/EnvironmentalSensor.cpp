@@ -2,13 +2,13 @@
 
 bool EnvironmentalSensor::init()
 {
-  bme.begin(BME280_ADDR);
+  envSensor.begin(BME280_ADDR);
 
-  bme.setSampling(Adafruit_BME280::MODE_FORCED,
-                  Adafruit_BME280::SAMPLING_X8, // temperature
-                  Adafruit_BME280::SAMPLING_X8, // pressure
-                  Adafruit_BME280::SAMPLING_X8, // humidity
-                  Adafruit_BME280::FILTER_OFF);
+  envSensor.setSampling(Adafruit_BME280::MODE_FORCED,
+                        Adafruit_BME280::SAMPLING_X8, // temperature
+                        Adafruit_BME280::SAMPLING_X8, // pressure
+                        Adafruit_BME280::SAMPLING_X8, // humidity
+                        Adafruit_BME280::FILTER_OFF);
 
   Serial.println("BME280 - Initialization: OK");
   return true;
@@ -17,13 +17,12 @@ bool EnvironmentalSensor::init()
 bool EnvironmentalSensor::read()
 {
   // Start measurement in forced mode
-  bme.takeForcedMeasurement();
+  envSensor.takeForcedMeasurement();
 
-  data.temperature = bme.readTemperature();
-  data.pressure = bme.readPressure() / 100.0F;
-  data.humidity = bme.readHumidity();
-  data.altitude = bme.readAltitude(1013.25);
-  data.isValid = true;
+  data.temperature = envSensor.readTemperature();
+  data.pressure = envSensor.readPressure() / 100.0F;
+  data.humidity = envSensor.readHumidity();
+  data.altitude = envSensor.readAltitude(1013.25);
   return true;
 }
 

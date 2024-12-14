@@ -4,7 +4,6 @@
 #include <SPI.h>
 #include "sensors/EnvironmentalSensor.h"
 #include "sensors/AccelerometerSensor.h"
-#include "sensors/MagnetometerSensor.h"
 #include "sensors/GPSSensor.h"
 #include "display/Display.h"
 #include "storage/Storage.h"
@@ -22,7 +21,6 @@ const uint64_t DISPLAY_TIME_MS = 5000;       // Display on duration: 5 seconds (
 // Global sensor objects for collecting environmental data
 EnvironmentalSensor envSensor;
 AccelerometerSensor accelSensor;
-MagnetometerSensor magSensor;
 GPSSensor gpsSensor;
 // Display display;
 

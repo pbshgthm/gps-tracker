@@ -59,7 +59,7 @@ public:
   void powerOff();
   bool read();
   void print();
-  Data get();
+  Data getData();
 
 private:
   TinyGPSPlus gps;

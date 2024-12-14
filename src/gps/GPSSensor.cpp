@@ -158,7 +158,7 @@ void GPSSensor::print()
   Serial.flush();
 }
 
-GPSSensor::Data GPSSensor::get()
+GPSSensor::Data GPSSensor::getData()
 {
   return data;
 }

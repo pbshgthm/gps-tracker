@@ -8,7 +8,6 @@ class EnvironmentalSensor
 public:
   struct Data
   {
-    bool isValid = false;
     float temperature = 0;
     float pressure = 0;
     float humidity = 0;
@@ -21,7 +20,7 @@ public:
   Data getData();
 
 private:
-  Adafruit_BME280 bme;
+  Adafruit_BME280 envSensor;
   Data data;
   static const uint8_t BME280_ADDR = 0x76;
 };
