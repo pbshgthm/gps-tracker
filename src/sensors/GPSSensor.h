@@ -1,32 +1,71 @@
 // GPSSensor.h
 #pragma once
-#include "SensorBase.h"
 #include <TinyGPS++.h>
+#include <HardwareSerial.h>
 
-class GPSSensor : public Sensor
+class GPSSensor
 {
 public:
   struct Data
   {
-    bool valid;
-    double latitude;
-    double longitude;
-    double altitude;
-    int satellites; // Changed from int to String
-    double speed;
-    double course;
-    float hdop;
-    unsigned long age;
+    struct Location
+    {
+      bool isValid;
+      double latitude;
+      double longitude;
+      uint32_t age;
+    } location;
+
+    struct Altitude
+    {
+      bool isValid;
+      double value;
+      uint32_t age;
+    } altitude;
+
+    struct Date
+    {
+      bool isValid;
+      uint32_t value;
+      uint32_t age;
+    } date;
+
+    struct Time
+    {
+      bool isValid;
+      uint32_t value;
+      uint32_t age;
+    } time;
+
+    struct Satellites
+    {
+      bool isValid;
+      uint32_t value;
+      uint32_t age;
+    } satellites;
+
+    struct HDOP
+    {
+      bool isValid;
+      float value;
+      uint32_t age;
+    } hdop;
   };
 
-  bool initialize() override;
-  bool read() override;
-  void print() override;
-  Data getData();
+  GPSSensor();
+
+  bool init();
+  void powerOn();
+  void powerOff();
+  bool read();
+  void print();
+  Data get();
 
 private:
   TinyGPSPlus gps;
   Data data;
+  HardwareSerial gpsSerial;
   static const int GPS_RX_PIN = 16;
   static const int GPS_TX_PIN = 17;
+  static const int BAUD_RATE = 9600;
 };

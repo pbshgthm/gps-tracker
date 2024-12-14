@@ -1,23 +1,23 @@
+// EnvironmentalSensor.h
 #pragma once
-#include "SensorBase.h"
+
 #include <Adafruit_BME280.h>
 
-class EnvironmentalSensor : public Sensor
+class EnvironmentalSensor
 {
 public:
   struct Data
   {
-    bool valid = false;
+    bool isValid = false;
     float temperature = 0;
     float pressure = 0;
     float humidity = 0;
     float altitude = 0;
   };
 
-  EnvironmentalSensor();
-  bool initialize() override;
-  bool read() override;
-  void print() override;
+  bool init();
+  bool read();
+  void print();
   Data getData();
 
 private:

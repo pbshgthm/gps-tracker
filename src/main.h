@@ -24,10 +24,10 @@ EnvironmentalSensor envSensor;
 AccelerometerSensor accelSensor;
 MagnetometerSensor magSensor;
 GPSSensor gpsSensor;
-Display display;
+// Display display;
 
 // Global storage object for logging sensor data
-Storage storage;
+// Storage storage;
 
 // Global time variable for timestamping sensor readings
 time_t now;
