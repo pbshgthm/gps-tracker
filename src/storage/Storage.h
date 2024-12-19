@@ -1,17 +1,21 @@
-// #include <Arduino.h>
-// #include <SD.h>
-// #include "sensors/EnvironmentalSensor.h"
+#include <Arduino.h>
+#include <SD.h>
+#include "../environmental/EnvironmentalSensor.h"
+#include "../accelerometer/AccelerometerSensor.h"
+#include "../gps/GPSSensor.h"
 
-// const int SD_CS_PIN = 5; // Chip Select pin for SD card
+const int SD_CS_PIN = 5; // Chip Select pin for SD card
 
-// // RTC memory variables - these persist across deep sleep cycles
-// RTC_DATA_ATTR static uint32_t bootIdentifier = 0;    // Unique identifier for each power-on boot
-// RTC_DATA_ATTR static char currentFileName[32] = {0}; // Current log file name storage
+RTC_DATA_ATTR static char currentFileName[32] = {0}; // Current log file name storage
 
-// class Storage
-// {
-// public:
-//   bool initializeSDCard();
-//   void logSensorData(const EnvironmentalSensor::Data &data, const time_t &timestamp);
-//   String generateLogFileName();
-// };
+class Storage
+{
+public:
+  void init();
+  void setLogFile();
+  void write(
+      const time_t &timestamp,
+      const EnvironmentalSensor::Data &envData,
+      const AccelerometerSensor::Data &accelData,
+      const GPSSensor::Data &gpsData);
+};

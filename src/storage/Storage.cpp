@@ -1,113 +1,114 @@
-// #include "Storage.h"
+#include "Storage.h"
 
-// String Storage::generateLogFileName()
-// {
-//   // Creates a unique filename by incrementing a counter until an unused name is found
-//   int fileCounter = 0;
-//   String fileName;
+void formatCSV(char *buffer, size_t bufferSize,
+               const time_t &timestamp,
+               const EnvironmentalSensor::Data &envData,
+               const AccelerometerSensor::Data &accelData,
+               const GPSSensor::Data &gpsData)
+{
+  snprintf(buffer, bufferSize,
+           "%ld,%.2f,%.1f,%.1f,%.2f,%.2f,%.2f,%.2f,%.5f,%.5f,%d,%.2f,%d,%lu,%d,%lu,%d,%d,%d,%.2f,%d",
+           timestamp,
+           envData.temperature,
+           envData.humidity,
+           envData.pressure,
+           accelData.x,
+           accelData.y,
+           accelData.z,
+           accelData.magnitude,
+           gpsData.location.latitude,
+           gpsData.location.longitude,
+           gpsData.location.age,
+           gpsData.altitude.value,
+           gpsData.altitude.age,
+           gpsData.date.value,
+           gpsData.date.age,
+           gpsData.time.value,
+           gpsData.time.age,
+           gpsData.satellites.value,
+           gpsData.satellites.age,
+           gpsData.hdop.value,
+           gpsData.hdop.age);
+}
 
-//   do
-//   {
-//     fileName = String("/log_") + String(fileCounter) + String(".csv");
-//     fileCounter++;
-//   } while (SD.exists(fileName.c_str()));
+void Storage::setLogFile()
+{
 
-//   // Store the filename in RTC memory for persistence during sleep cycles
-//   fileName.toCharArray(currentFileName, sizeof(currentFileName));
+  if (currentFileName[0] != 0 && SD.exists(currentFileName))
+  {
+    Serial.println("Current log file: " + String(currentFileName));
+    return;
+  }
+  else
+  {
+    Serial.println("No current log file");
+  }
 
-//   return fileName;
-// }
+  int fileCounter = 0;
+  while (true)
+  {
+    snprintf(currentFileName, sizeof(currentFileName), "/log_%d.csv", fileCounter);
+    if (!SD.exists(currentFileName))
+      break;
+    fileCounter++;
+  }
 
-// bool Storage::initializeSDCard()
-// {
-//   // Begin SD card communication using the specified chip select pin
-//   if (!SD.begin(SD_CS_PIN))
-//   {
-//     Serial.println("SD Card initialization failed!");
-//     return false;
-//   }
+  File dataFile = SD.open(currentFileName, FILE_WRITE);
+  if (dataFile)
+  {
+    // Write the header row with meaningful terms
+    dataFile.println(
+        "Timestamp,"
+        "Temperature (C),Pressure (hPa),Humidity (%),"
+        "Accel X (m/s^2),Accel Y (m/s^2),Accel Z (m/s^2),Accel Magnitude (m/s^2),"
+        "Latitude (deg),Longitude (deg),Location Age (ms),"
+        "Altitude (m),Altitude Age (ms),"
+        "Date (YYYYMMDD),Date Age (ms),"
+        "Time (HHMMSS),Time Age (ms),"
+        "Satellites Count,Satellites Age (ms),"
+        "HDOP,HDOP Age (ms)");
+    dataFile.close();
+    Serial.println("Created new log file: " + String(currentFileName));
+  }
+  else
+  {
+    Serial.println("Error creating new log file!");
+  }
+}
 
-//   Serial.println("SD Card initialization successful.");
+void Storage::init()
+{
+  if (!SD.begin(SD_CS_PIN))
+  {
+    Serial.println("SD Card initialization failed!");
+    return;
+  }
+  Serial.println("SD Card initialization successful.");
+  setLogFile();
+}
 
-//   // Generate a new random identifier for fresh boots
-//   uint32_t newBootIdentifier = esp_random();
+void Storage::write(
+    const time_t &timestamp,
+    const EnvironmentalSensor::Data &envData,
+    const AccelerometerSensor::Data &accelData,
+    const GPSSensor::Data &gpsData)
+{
+  if (currentFileName[0] == 0)
+  {
+    Serial.println("No valid log file set!");
+    return;
+  }
 
-//   // Check if this is a new boot by verifying boot identifier and filename
-//   bool isNewBoot = (bootIdentifier == 0 || strlen(currentFileName) == 0);
+  File file = SD.open(currentFileName, FILE_WRITE);
+  if (!file)
+  {
+    Serial.println("Failed to open file for writing");
+    return;
+  }
 
-//   if (isNewBoot)
-//   {
-//     // This is a fresh boot - set up new logging session
-//     bootIdentifier = newBootIdentifier;
-//     String newFileName = generateLogFileName();
+  char dataString[512];
+  formatCSV(dataString, sizeof(dataString), timestamp, envData, accelData, gpsData);
 
-//     // Create new log file with headers
-//     File dataFile = SD.open(currentFileName, FILE_WRITE);
-//     if (dataFile)
-//     {
-//       dataFile.println("Time_ms,Temperature_C,Humidity_Percent,Pressure_hPa");
-//       dataFile.close();
-//       Serial.println("Created new log file: " + String(currentFileName));
-//     }
-//     else
-//     {
-//       Serial.println("Error creating new log file!");
-//       return false;
-//     }
-//   }
-//   else
-//   {
-//     // Continuing existing session after sleep
-//     Serial.println("Continuing with existing log file: " + String(currentFileName));
-
-//     // Verify the existing file is still accessible
-//     if (!SD.exists(currentFileName))
-//     {
-//       Serial.println("Warning: Existing log file not found! Creating new file.");
-//       String newFileName = generateLogFileName();
-//       File dataFile = SD.open(currentFileName, FILE_WRITE);
-//       if (dataFile)
-//       {
-//         dataFile.println("Time_ms,Temperature_C,Humidity_Percent,Pressure_hPa");
-//         dataFile.close();
-//       }
-//       else
-//       {
-//         return false;
-//       }
-//     }
-//   }
-
-//   return true;
-// }
-
-// void Storage::logSensorData(const EnvironmentalSensor::Data &envData, const time_t &now)
-// {
-//   // Verify sensor data validity before logging
-//   if (!envData.valid)
-//   {
-//     Serial.println("Invalid sensor data - skipping logging");
-//     return;
-//   }
-
-//   // Open existing log file in append mode
-//   File dataFile = SD.open(currentFileName, FILE_APPEND);
-//   if (dataFile)
-//   {
-
-//     // Create data string with all sensor readings
-//     String dataString = String(now) + "," +
-//                         String(envData.temperature, 2) + "," +
-//                         String(envData.humidity, 1) + "," +
-//                         String(envData.pressure, 1);
-
-//     // Write to file and close
-//     dataFile.println(dataString);
-//     dataFile.close();
-//     Serial.println("Data logged: " + dataString);
-//   }
-//   else
-//   {
-//     Serial.println("Error opening log file for writing!");
-//   }
-// }
+  file.println(dataString);
+  file.close();
+}
