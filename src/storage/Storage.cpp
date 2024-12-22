@@ -99,7 +99,8 @@ void Storage::write(
     return;
   }
 
-  File file = SD.open(currentFileName, FILE_WRITE);
+  // Open the file in append mode
+  File file = SD.open(currentFileName, FILE_APPEND);
   if (!file)
   {
     Serial.println("Failed to open file for writing");

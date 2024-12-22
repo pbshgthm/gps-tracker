@@ -5,96 +5,202 @@
 #include "environmental/EnvironmentalSensor.h"
 #include "accelerometer/AccelerometerSensor.h"
 
-const uint64_t uS_TO_S_FACTOR = 1000000;
-const uint64_t TIME_TO_SLEEP = 10; // Sleep duration in seconds
-#define BUTTON_PIN 15              // GPIO pin for button press
+// --------------------- Constants & Config -----------------------
+#define BUTTON_PIN 15
+#define DOUBLE_PRESS_WINDOW 500   // milliseconds
+#define LONG_PRESS_THRESHOLD 2000 // milliseconds
+const uint64_t uS_TO_S_FACTOR = 1000000ULL;
+const uint64_t TIME_TO_SLEEP = 10; // in seconds
 
-time_t timestamp;
-
+// --------------------- Global Objects ---------------------------
 GPSSensor gpsSensor;
 EnvironmentalSensor envSensor;
 AccelerometerSensor accSensor;
 Display display;
 Storage storage;
+time_t timestamp; // For storing time in logs
 
-void sleep()
+// --------------------- Sleep Helper -----------------------------
+void goToSleep()
 {
-  Serial.println("Going to sleep");
-  Serial.flush(); // Ensure all serial data is transmitted
+  Serial.println("[INFO] Going to deep sleep...");
+  Serial.flush();
 
-  // Configure wake-up sources
-  esp_sleep_enable_timer_wakeup(TIME_TO_SLEEP * uS_TO_S_FACTOR); // Timer-based wake-up
-  esp_sleep_enable_ext0_wakeup(GPIO_NUM_15, 0);                  // Button-based wake-up (LOW signal)
+  // Enable wake-up from button (EXT0).
+  esp_sleep_enable_ext0_wakeup(GPIO_NUM_15, 0);
 
-  // Enter deep sleep mode
+  // Enable wake-up from timer.
+  esp_sleep_enable_timer_wakeup(TIME_TO_SLEEP * uS_TO_S_FACTOR);
+
+  // Enter deep sleep.
   esp_deep_sleep_start();
 }
 
-void readSensors()
+// --------------------- Sensor & Logging --------------------------
+void initAndReadSensors()
 {
+  // Initialize each sensor (custom code in your libraries)
   gpsSensor.init();
   envSensor.init();
   accSensor.init();
 
+  // Example sequence: power on GPS, wait, power off, then read.
   gpsSensor.powerOn();
   delay(2000);
   gpsSensor.powerOff();
 
+  // Read from each sensor
   gpsSensor.read();
   envSensor.read();
   accSensor.read();
 
+  // Print for debugging
   gpsSensor.print();
   envSensor.print();
   accSensor.print();
 }
 
-void displayButtonPress()
+void logData()
 {
+  storage.init();
+  storage.write(timestamp, envSensor.getData(), accSensor.getData(), gpsSensor.getData());
+  Serial.println("[INFO] Data logged to storage.");
+}
+
+// --------------------- Press Handlers ---------------------------
+
+void handleSinglePress()
+{
+  Serial.println("[EVENT] Single Press");
   display.init();
   display.turnOn();
-  readSensors();
-  display.updateDisplay(envSensor.getData(), accSensor.getData(), gpsSensor.getData());
-  delay(3000);
+  display.greet();
+
+  initAndReadSensors();
+  logData();
+
+  // Update the display
+  display.showData(envSensor.getData(), accSensor.getData(), gpsSensor.getData());
+  delay(3000); // Display the data for a few seconds
+
   display.turnOff();
-  sleep();
+  goToSleep();
 }
 
-void routineWakeUp()
+void handleDoublePress()
 {
-  readSensors();
-  storage.write(timestamp, envSensor.getData(), accSensor.getData(), gpsSensor.getData());
-  sleep();
+  Serial.println("[EVENT] Double Press");
+  initAndReadSensors();
+  logData();
+
+  Serial.println("double press to console");
+  goToSleep();
 }
 
+void handleLongPress()
+{
+  Serial.println("[EVENT] Long Press");
+  initAndReadSensors();
+  logData();
+
+  Serial.println("long press to the monitor");
+  delay(15000);
+
+  goToSleep();
+}
+
+// --------------------- Timer Wake-Up Logic -----------------------
+void handleTimerWakeUp()
+{
+  Serial.println("[INFO] Timer wake-up or first boot/unexpected wake");
+  initAndReadSensors();
+  logData();
+  goToSleep();
+}
+
+// --------------------- Button Press Detection --------------------
+
+void detectButtonPress()
+{
+  unsigned long pressStart = millis();
+
+  // 1) Check Long Press (button is still LOW upon wake-up).
+  while (digitalRead(BUTTON_PIN) == LOW)
+  {
+    if (millis() - pressStart >= LONG_PRESS_THRESHOLD)
+    {
+      // It's a Long Press
+      handleLongPress();
+      return; // Stop after handling
+    }
+    delay(5);
+  }
+
+  // 2) If we exit the loop, button was released before LONG_PRESS_THRESHOLD.
+  //    Let's see if there's a 2nd press within DOUBLE_PRESS_WINDOW.
+  bool secondPressDetected = false;
+  unsigned long firstReleaseTime = millis();
+
+  while (millis() - firstReleaseTime < DOUBLE_PRESS_WINDOW)
+  {
+    if (digitalRead(BUTTON_PIN) == LOW)
+    {
+      // Wait for user to release second press
+      while (digitalRead(BUTTON_PIN) == LOW)
+      {
+        delay(5);
+      }
+      secondPressDetected = true;
+      break;
+    }
+    delay(5);
+  }
+
+  // 3) Decide single vs double press
+  if (secondPressDetected)
+  {
+    handleDoublePress();
+  }
+  else
+  {
+    handleSinglePress();
+  }
+}
+
+// --------------------- Setup & Loop -----------------------------
 void setup()
 {
   Serial.begin(115200);
   delay(100);
-  storage.init();
-  time(&timestamp);
-
   pinMode(BUTTON_PIN, INPUT_PULLUP);
 
+  // Get current time (for logging)
+  time(&timestamp);
+
+  // Determine wake-up cause
   esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
 
   switch (wakeup_reason)
   {
   case ESP_SLEEP_WAKEUP_EXT0:
-    displayButtonPress();
+    Serial.println("[INFO] Woke up by button press (EXT0)");
+    detectButtonPress();
     break;
 
   case ESP_SLEEP_WAKEUP_TIMER:
-    routineWakeUp();
+    Serial.println("[INFO] Woke up by timer");
+    handleTimerWakeUp();
     break;
 
   default:
-    Serial.println("First boot or unexpected wake-up");
-    routineWakeUp();
+    // First boot or other cause
+    Serial.println("[INFO] First boot or unexpected wake-up");
+    handleTimerWakeUp();
     break;
   }
 }
 
 void loop()
 {
+  // Normally empty for deep-sleep scenarios
 }

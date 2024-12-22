@@ -28,7 +28,7 @@ void Display::turnOff()
   u8g2.sendBuffer();
 }
 
-void Display::updateDisplay(
+void Display::showData(
     const EnvironmentalSensor::Data &envData,
     const AccelerometerSensor::Data &accelData,
     const GPSSensor::Data &gpsData)
@@ -85,5 +85,29 @@ void Display::updateDisplay(
   }
   u8g2.drawStr(0, 64, buf); // Fifth line
 
+  u8g2.sendBuffer();
+}
+
+void Display::greet()
+{
+  u8g2.clearBuffer();
+  u8g2.setFont(u8g2_font_8x13_tf);
+  u8g2.drawStr(0, 13, "Pathfinder");
+  u8g2.sendBuffer();
+}
+
+void Display::alertWifi()
+{
+  u8g2.clearBuffer();
+  u8g2.setFont(u8g2_font_8x13_tf);
+  u8g2.drawStr(0, 13, "WiFi Started");
+  u8g2.sendBuffer();
+}
+
+void Display::alertWaypoint()
+{
+  u8g2.clearBuffer();
+  u8g2.setFont(u8g2_font_8x13_tf);
+  u8g2.drawStr(0, 13, "Waypoint Added");
   u8g2.sendBuffer();
 }

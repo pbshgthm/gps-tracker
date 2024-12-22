@@ -13,10 +13,13 @@ public:
   void turnOn();
   void turnOff();
 
-  void updateDisplay(
+  void greet();
+  void showData(
       const EnvironmentalSensor::Data &envData,
       const AccelerometerSensor::Data &accelData,
       const GPSSensor::Data &gpsData);
+  void alertWifi();
+  void alertWaypoint();
 
 private:
   U8G2_SH1106_128X64_NONAME_F_HW_I2C u8g2;
