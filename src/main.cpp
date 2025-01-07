@@ -6,7 +6,9 @@
 #include "accelerometer/AccelerometerSensor.h"
 
 // --------------------- Constants & Config -----------------------
-#define BUTTON_PIN 15
+#define BUZZER_PIN 12
+#define BUTTON_PIN_1 32
+#define BUTTON_PIN_2 33
 #define DOUBLE_PRESS_WINDOW 500   // milliseconds
 #define LONG_PRESS_THRESHOLD 2000 // milliseconds
 const uint64_t uS_TO_S_FACTOR = 1000000ULL;
@@ -19,6 +21,20 @@ AccelerometerSensor accSensor;
 Display display;
 Storage storage;
 time_t timestamp; // For storing time in logs
+
+void beepOnce()
+{
+  ledcWriteTone(0, 2000); // Play 2 kHz tone
+  delay(100);             // for 100 ms
+  ledcWriteTone(0, 0);    // Stop buzzer
+}
+
+void beepTwice()
+{
+  beepOnce();
+  delay(100);
+  beepOnce();
+}
 
 // --------------------- Sleep Helper -----------------------------
 void goToSleep()
@@ -71,6 +87,7 @@ void logData()
 
 void handleSinglePress()
 {
+  beepOnce();
   Serial.println("[EVENT] Single Press");
   display.init();
   display.turnOn();
@@ -81,7 +98,7 @@ void handleSinglePress()
 
   // Update the display
   display.showData(envSensor.getData(), accSensor.getData(), gpsSensor.getData());
-  delay(3000); // Display the data for a few seconds
+  delay(5000); // Display the data for a few seconds
 
   display.turnOff();
   goToSleep();
@@ -89,6 +106,7 @@ void handleSinglePress()
 
 void handleDoublePress()
 {
+  beepTwice();
   Serial.println("[EVENT] Double Press");
   initAndReadSensors();
   logData();
@@ -125,7 +143,7 @@ void detectButtonPress()
   unsigned long pressStart = millis();
 
   // 1) Check Long Press (button is still LOW upon wake-up).
-  while (digitalRead(BUTTON_PIN) == LOW)
+  while (digitalRead(BUTTON_PIN_1) == LOW)
   {
     if (millis() - pressStart >= LONG_PRESS_THRESHOLD)
     {
@@ -143,10 +161,10 @@ void detectButtonPress()
 
   while (millis() - firstReleaseTime < DOUBLE_PRESS_WINDOW)
   {
-    if (digitalRead(BUTTON_PIN) == LOW)
+    if (digitalRead(BUTTON_PIN_1) == LOW)
     {
       // Wait for user to release second press
-      while (digitalRead(BUTTON_PIN) == LOW)
+      while (digitalRead(BUTTON_PIN_1) == LOW)
       {
         delay(5);
       }
@@ -172,7 +190,10 @@ void setup()
 {
   Serial.begin(115200);
   delay(100);
-  pinMode(BUTTON_PIN, INPUT_PULLUP);
+  pinMode(BUTTON_PIN_1, INPUT_PULLUP);
+
+  ledcSetup(0, 2000, 8);        // Channel 0, 2 kHz frequency, 8-bit resolution
+  ledcAttachPin(BUZZER_PIN, 0); // Attach channel 0 to BUZZER_PIN
 
   // Get current time (for logging)
   time(&timestamp);
