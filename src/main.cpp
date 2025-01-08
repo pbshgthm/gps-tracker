@@ -6,10 +6,11 @@
 #include "accelerometer/AccelerometerSensor.h"
 
 // --------------------- Constants & Config -----------------------
+#define BUZZER_PIN 12
 #define BUTTON_PIN_1 32
 #define BUTTON_PIN_2 33
 
-#define LONG_PRESS_THRESHOLD 2000 // milliseconds
+#define LONG_PRESS_THRESHOLD 1000 // milliseconds
 
 const uint64_t uS_TO_S_FACTOR = 1000000ULL;
 const uint64_t TIME_TO_SLEEP = 10; // in seconds
@@ -32,6 +33,8 @@ void button1ShortPress();
 void button1LongPress();
 void button2ShortPress();
 void button2LongPress();
+void beepOnce();
+void beepTwice();
 
 // --------------------- Sensor & Logging -------------------------
 void initAndReadSensors()
@@ -64,6 +67,20 @@ void logData()
   Serial.println("[INFO] Data logged to storage.");
 }
 
+void beepOnce()
+{
+  ledcWriteTone(0, 2000); // Play 2 kHz tone
+  delay(100);             // for 100 ms
+  ledcWriteTone(0, 0);    // Stop buzzer
+}
+
+void beepTwice()
+{
+  beepOnce();
+  delay(100);
+  beepOnce();
+}
+
 // --------------------- Timer Wake-Up Logic ----------------------
 void handleTimerWakeUp()
 {
@@ -76,6 +93,7 @@ void handleTimerWakeUp()
 // --------------------- Button Press Routines --------------------
 void button1ShortPress()
 {
+  beepOnce();
   // Equivalent to old handleSinglePress()
   Serial.println("[EVENT] Button 1 short press (Single Press)");
 
@@ -98,41 +116,28 @@ void button1ShortPress()
 
 void button1LongPress()
 {
+  beepTwice();
   // Equivalent to old handleLongPress()
   Serial.println("[EVENT] Button 1 long press");
-
-  initAndReadSensors();
-  logData();
-
-  Serial.println("Long press action for Button 1.");
-  delay(15000); // Example delay
+  delay(2000); // Example delay
 
   goToSleep();
 }
 
 void button2ShortPress()
 {
+  beepOnce();
   Serial.println("[EVENT] Button 2 short press");
-
-  // You can replicate the same logic as Button 1 short or do something unique
-  initAndReadSensors();
-  logData();
-  // For illustration, let's show data on the serial console only
-  Serial.println("Short press action for Button 2.");
-  delay(5000);
+  delay(2000);
 
   goToSleep();
 }
 
 void button2LongPress()
 {
+  beepTwice();
   Serial.println("[EVENT] Button 2 long press");
-
-  initAndReadSensors();
-  logData();
-
-  Serial.println("Long press action for Button 2.");
-  delay(5000);
+  delay(2000);
 
   goToSleep();
 }
@@ -227,6 +232,9 @@ void setup()
   // Configure the buttons as inputs with internal pull-down
   pinMode(BUTTON_PIN_1, INPUT_PULLDOWN);
   pinMode(BUTTON_PIN_2, INPUT_PULLDOWN);
+
+  ledcSetup(0, 2000, 8);        // Channel 0, 2 kHz frequency, 8-bit resolution
+  ledcAttachPin(BUZZER_PIN, 0); // Attach channel 0 to BUZZER_PIN
 
   // Grab current time for logging
   time(&timestamp);
