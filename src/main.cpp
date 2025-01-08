@@ -117,7 +117,6 @@ void button2ShortPress()
   // You can replicate the same logic as Button 1 short or do something unique
   initAndReadSensors();
   logData();
-
   // For illustration, let's show data on the serial console only
   Serial.println("Short press action for Button 2.");
   delay(5000);
