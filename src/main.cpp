@@ -6,9 +6,11 @@
 #include "accelerometer/AccelerometerSensor.h"
 
 // --------------------- Constants & Config -----------------------
-#define BUTTON_PIN 15
-#define DOUBLE_PRESS_WINDOW 500   // milliseconds
+#define BUTTON_PIN_1 32
+#define BUTTON_PIN_2 33
+
 #define LONG_PRESS_THRESHOLD 2000 // milliseconds
+
 const uint64_t uS_TO_S_FACTOR = 1000000ULL;
 const uint64_t TIME_TO_SLEEP = 10; // in seconds
 
@@ -20,23 +22,18 @@ Display display;
 Storage storage;
 time_t timestamp; // For storing time in logs
 
-// --------------------- Sleep Helper -----------------------------
-void goToSleep()
-{
-  Serial.println("[INFO] Going to deep sleep...");
-  Serial.flush();
+// --------------------- Function Prototypes ----------------------
+void initAndReadSensors();
+void logData();
+void handleTimerWakeUp();
+void goToSleep();
+void handleWakeup();
+void button1ShortPress();
+void button1LongPress();
+void button2ShortPress();
+void button2LongPress();
 
-  // Enable wake-up from button (EXT0).
-  esp_sleep_enable_ext0_wakeup(GPIO_NUM_15, 0);
-
-  // Enable wake-up from timer.
-  esp_sleep_enable_timer_wakeup(TIME_TO_SLEEP * uS_TO_S_FACTOR);
-
-  // Enter deep sleep.
-  esp_deep_sleep_start();
-}
-
-// --------------------- Sensor & Logging --------------------------
+// --------------------- Sensor & Logging -------------------------
 void initAndReadSensors()
 {
   // Initialize each sensor (custom code in your libraries)
@@ -67,49 +64,7 @@ void logData()
   Serial.println("[INFO] Data logged to storage.");
 }
 
-// --------------------- Press Handlers ---------------------------
-
-void handleSinglePress()
-{
-  Serial.println("[EVENT] Single Press");
-  display.init();
-  display.turnOn();
-  display.greet();
-
-  initAndReadSensors();
-  logData();
-
-  // Update the display
-  display.showData(envSensor.getData(), accSensor.getData(), gpsSensor.getData());
-  delay(3000); // Display the data for a few seconds
-
-  display.turnOff();
-  goToSleep();
-}
-
-void handleDoublePress()
-{
-  Serial.println("[EVENT] Double Press");
-  initAndReadSensors();
-  logData();
-
-  Serial.println("double press to console");
-  goToSleep();
-}
-
-void handleLongPress()
-{
-  Serial.println("[EVENT] Long Press");
-  initAndReadSensors();
-  logData();
-
-  Serial.println("long press to the monitor");
-  delay(15000);
-
-  goToSleep();
-}
-
-// --------------------- Timer Wake-Up Logic -----------------------
+// --------------------- Timer Wake-Up Logic ----------------------
 void handleTimerWakeUp()
 {
   Serial.println("[INFO] Timer wake-up or first boot/unexpected wake");
@@ -118,52 +73,149 @@ void handleTimerWakeUp()
   goToSleep();
 }
 
-// --------------------- Button Press Detection --------------------
-
-void detectButtonPress()
+// --------------------- Button Press Routines --------------------
+void button1ShortPress()
 {
-  unsigned long pressStart = millis();
+  // Equivalent to old handleSinglePress()
+  Serial.println("[EVENT] Button 1 short press (Single Press)");
 
-  // 1) Check Long Press (button is still LOW upon wake-up).
-  while (digitalRead(BUTTON_PIN) == LOW)
+  // Use the display
+  display.init();
+  display.turnOn();
+  display.greet();
+
+  // Perform sensor reading & logging
+  initAndReadSensors();
+  logData();
+
+  // Show data on display
+  display.showData(envSensor.getData(), accSensor.getData(), gpsSensor.getData());
+  delay(3000); // Keep data displayed for a bit
+
+  display.turnOff();
+  goToSleep();
+}
+
+void button1LongPress()
+{
+  // Equivalent to old handleLongPress()
+  Serial.println("[EVENT] Button 1 long press");
+
+  initAndReadSensors();
+  logData();
+
+  Serial.println("Long press action for Button 1.");
+  delay(15000); // Example delay
+
+  goToSleep();
+}
+
+void button2ShortPress()
+{
+  Serial.println("[EVENT] Button 2 short press");
+
+  // You can replicate the same logic as Button 1 short or do something unique
+  initAndReadSensors();
+  logData();
+
+  // For illustration, let's show data on the serial console only
+  Serial.println("Short press action for Button 2.");
+  delay(5000);
+
+  goToSleep();
+}
+
+void button2LongPress()
+{
+  Serial.println("[EVENT] Button 2 long press");
+
+  initAndReadSensors();
+  logData();
+
+  Serial.println("Long press action for Button 2.");
+  delay(5000);
+
+  goToSleep();
+}
+
+// --------------------- Sleep Helper -----------------------------
+void goToSleep()
+{
+  Serial.println("[INFO] Going to deep sleep...");
+  Serial.flush();
+
+  // Enable wake-up from ext1 for pins 32 or 33 (HIGH level).
+  esp_sleep_enable_ext1_wakeup((1ULL << BUTTON_PIN_1) | (1ULL << BUTTON_PIN_2),
+                               ESP_EXT1_WAKEUP_ANY_HIGH);
+
+  // Enable wake-up from timer, same as original
+  esp_sleep_enable_timer_wakeup(TIME_TO_SLEEP * uS_TO_S_FACTOR);
+
+  // Enter deep sleep.
+  esp_deep_sleep_start();
+}
+
+// --------------------- Wake-Up Handler --------------------------
+void handleWakeup()
+{
+  esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
+
+  switch (wakeup_reason)
   {
-    if (millis() - pressStart >= LONG_PRESS_THRESHOLD)
-    {
-      // It's a Long Press
-      handleLongPress();
-      return; // Stop after handling
-    }
-    delay(5);
-  }
-
-  // 2) If we exit the loop, button was released before LONG_PRESS_THRESHOLD.
-  //    Let's see if there's a 2nd press within DOUBLE_PRESS_WINDOW.
-  bool secondPressDetected = false;
-  unsigned long firstReleaseTime = millis();
-
-  while (millis() - firstReleaseTime < DOUBLE_PRESS_WINDOW)
+  case ESP_SLEEP_WAKEUP_EXT1:
   {
-    if (digitalRead(BUTTON_PIN) == LOW)
+    // Figure out which pin(s) triggered the wake-up
+    uint64_t wakeup_pins = esp_sleep_get_ext1_wakeup_status();
+
+    // BUTTON_PIN_1 check
+    if (wakeup_pins & (1ULL << BUTTON_PIN_1))
     {
-      // Wait for user to release second press
-      while (digitalRead(BUTTON_PIN) == LOW)
+      // Measure press duration
+      unsigned long pressStart = millis();
+      while (digitalRead(BUTTON_PIN_1) == HIGH)
       {
+        if (millis() - pressStart >= LONG_PRESS_THRESHOLD)
+        {
+          button1LongPress();
+          return; // Stop after handling
+        }
         delay(5);
       }
-      secondPressDetected = true;
-      break;
+      // If we exit the loop, it was a short press
+      button1ShortPress();
+      return;
     }
-    delay(5);
+
+    // BUTTON_PIN_2 check
+    if (wakeup_pins & (1ULL << BUTTON_PIN_2))
+    {
+      unsigned long pressStart = millis();
+      while (digitalRead(BUTTON_PIN_2) == HIGH)
+      {
+        if (millis() - pressStart >= LONG_PRESS_THRESHOLD)
+        {
+          button2LongPress();
+          return;
+        }
+        delay(5);
+      }
+      button2ShortPress();
+      return;
+    }
+
+    break;
   }
 
-  // 3) Decide single vs double press
-  if (secondPressDetected)
-  {
-    handleDoublePress();
-  }
-  else
-  {
-    handleSinglePress();
+  case ESP_SLEEP_WAKEUP_TIMER:
+    Serial.println("[INFO] Woke up by timer");
+    handleTimerWakeUp();
+    break;
+
+  default:
+    Serial.println("[INFO] First boot or unexpected wake-up");
+    // Just reuse your timer logic for first boot/unexpected
+    handleTimerWakeUp();
+    break;
   }
 }
 
@@ -172,32 +224,19 @@ void setup()
 {
   Serial.begin(115200);
   delay(100);
-  pinMode(BUTTON_PIN, INPUT_PULLUP);
 
-  // Get current time (for logging)
+  // Configure the buttons as inputs with internal pull-down
+  pinMode(BUTTON_PIN_1, INPUT_PULLDOWN);
+  pinMode(BUTTON_PIN_2, INPUT_PULLDOWN);
+
+  // Grab current time for logging
   time(&timestamp);
 
-  // Determine wake-up cause
-  esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
+  // Determine wake-up cause and handle accordingly
+  handleWakeup();
 
-  switch (wakeup_reason)
-  {
-  case ESP_SLEEP_WAKEUP_EXT0:
-    Serial.println("[INFO] Woke up by button press (EXT0)");
-    detectButtonPress();
-    break;
-
-  case ESP_SLEEP_WAKEUP_TIMER:
-    Serial.println("[INFO] Woke up by timer");
-    handleTimerWakeUp();
-    break;
-
-  default:
-    // First boot or other cause
-    Serial.println("[INFO] First boot or unexpected wake-up");
-    handleTimerWakeUp();
-    break;
-  }
+  // After handling wakeup, go to sleep
+  goToSleep();
 }
 
 void loop()
